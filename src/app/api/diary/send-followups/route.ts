@@ -120,14 +120,18 @@ async function sendEmail(args: {
   });
 }
 
-export async function POST(request: Request) {
-  // Simple cron auth
+/** Vercel Cron sends `Authorization: Bearer <CRON_SECRET>`. Manual calls may use `x-cron-secret`. */
+function verifyCronAuth(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
-  const provided = request.headers.get("x-cron-secret") ?? "";
-  if (secret && provided !== secret) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!secret) return true;
+  const auth = request.headers.get("authorization") ?? "";
+  const bearer = auth.startsWith("Bearer ") ? auth.slice("Bearer ".length).trim() : "";
+  if (bearer === secret) return true;
+  const header = request.headers.get("x-cron-secret") ?? "";
+  return header === secret;
+}
 
+async function runSendFollowups() {
   if (!isSupabaseConfigured) {
     return NextResponse.json(
       { error: "Supabase is not configured for this environment." },
@@ -229,5 +233,19 @@ export async function POST(request: Request) {
     tomorrow: tomorrowYmd,
     results,
   });
+}
+
+export async function GET(request: Request) {
+  if (!verifyCronAuth(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  return runSendFollowups();
+}
+
+export async function POST(request: Request) {
+  if (!verifyCronAuth(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  return runSendFollowups();
 }
 

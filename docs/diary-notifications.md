@@ -16,12 +16,12 @@
 
 - `RESEND_API_KEY`
 - `DIARY_NOTIFICATION_FROM_EMAIL` (example: `DFCG <notifications@yourdomain.com>`)
-- `CRON_SECRET` (used as `x-cron-secret` header on the cron request)
+- `CRON_SECRET` — set in Vercel project settings. Vercel Cron sends `Authorization: Bearer <CRON_SECRET>` automatically. For manual testing you can also send `x-cron-secret: <CRON_SECRET>`.
 
 ## API endpoint (cron target)
 
-- `POST /api/diary/send-followups`
-- Header: `x-cron-secret: <CRON_SECRET>`
+- `GET` or `POST /api/diary/send-followups`
+- Auth: `Authorization: Bearer <CRON_SECRET>` (Vercel Cron) or `x-cron-secret: <CRON_SECRET>` (manual)
 
 ## Suggested database table
 
@@ -41,7 +41,9 @@ create index if not exists diary_entries_follow_up_date_idx
   on public.diary_entries (follow_up_date);
 ```
 
-## Cron scheduling
+## Cron scheduling (Vercel)
 
-Schedule a daily cron job for **00:00 America/Chicago** that calls the endpoint above.
+The repo includes `vercel.json` with a cron on **`/api/diary/send-followups`**. Schedules are **UTC**. The default is **`0 6 * * *`** (06:00 UTC), which is **midnight Central Standard Time (CST)**. During daylight saving (CDT), that run is **01:00 local** — adjust the cron expression in `vercel.json` if you need midnight local year-round (e.g. use `0 5 * * *` during CDT months, or accept one hour offset).
+
+After deploy, confirm **Cron Jobs** in the Vercel project and that `CRON_SECRET` is set so invocations are authorized.
 
