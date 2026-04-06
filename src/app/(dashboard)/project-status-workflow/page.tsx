@@ -1,0 +1,59 @@
+import { redirect } from "next/navigation";
+import type { Profile } from "@/types/index";
+import { WorkflowEditorClient } from "./workflow-editor-client";
+
+const isSupabaseConfigured =
+  process.env.NEXT_PUBLIC_SUPABASE_URL?.startsWith("http") ?? false;
+
+const mockProfile: Profile = {
+  id: "mock-user-id",
+  first_name: "Tim",
+  last_name: "Reynolds",
+  email: "tim@dfcg.com",
+  phone_number: "(555) 123-4567",
+  role: "admin",
+  status: "active",
+  avatar_url: null,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+async function getProfile(): Promise<Profile> {
+  if (!isSupabaseConfigured) {
+    return mockProfile;
+  }
+
+  const { createClient } = await import("@/lib/supabase/server");
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select(
+      "id, first_name, last_name, email, phone_number, role, status, avatar_url, created_at, updated_at"
+    )
+    .eq("id", user.id)
+    .single();
+
+  if (!profile) {
+    redirect("/login");
+  }
+
+  return profile as Profile;
+}
+
+export default async function ProjectStatusWorkflowPage() {
+  const profile = await getProfile();
+  if (profile.role !== "admin" && profile.role !== "pic") {
+    redirect("/");
+  }
+
+  return <WorkflowEditorClient />;
+}
