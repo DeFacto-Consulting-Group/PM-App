@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Plus, MoreHorizontal } from "lucide-react";
+import { Loader2, Plus, MoreHorizontal, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { UserRole } from "@/types/index";
 import { formatPhoneDisplay } from "@/lib/format-phone";
+import { DFCG_DIRECTORY_USERS } from "@/data/dfcg-directory-users";
 
 const isSupabaseConfigured =
   process.env.NEXT_PUBLIC_SUPABASE_URL?.startsWith("http") ?? false;
@@ -75,68 +76,15 @@ const ROLE_COLORS: Record<UserRole, string> = {
   guest: "bg-gray-100 text-gray-600 border-gray-200",
 };
 
-const mockUsers: UserRow[] = [
-  {
-    id: "u1",
-    first_name: "John",
-    last_name: "Harrison",
-    email: "john.harrison@dfcg.com",
-    phone_number: "(555) 123-4567",
-    role: "admin",
-    status: "active",
-    initials: "JH",
-  },
-  {
-    id: "u2",
-    first_name: "Sarah",
-    last_name: "Chen",
-    email: "sarah.chen@dfcg.com",
-    phone_number: "(555) 234-5678",
-    role: "pic",
-    status: "active",
-    initials: "SC",
-  },
-  {
-    id: "u3",
-    first_name: "Michael",
-    last_name: "Torres",
-    email: "michael.torres@dfcg.com",
-    phone_number: "(555) 345-6789",
-    role: "project_manager",
-    status: "active",
-    initials: "MT",
-  },
-  {
-    id: "u4",
-    first_name: "Emily",
-    last_name: "Walsh",
-    email: "emily.walsh@dfcg.com",
-    phone_number: "(555) 456-7890",
-    role: "pic",
-    status: "active",
-    initials: "EW",
-  },
-  {
-    id: "u5",
-    first_name: "Robert",
-    last_name: "Kim",
-    email: "robert.kim@dfcg.com",
-    phone_number: "(555) 567-8901",
-    role: "project_manager",
-    status: "active",
-    initials: "RK",
-  },
-  {
-    id: "u6",
-    first_name: "Lisa",
-    last_name: "Patel",
-    email: "lisa.patel@dfcg.com",
-    phone_number: "(555) 678-9012",
-    role: "guest",
-    status: "inactive",
-    initials: "LP",
-  },
-];
+const ROLE_SHORT: Record<UserRole, string> = {
+  admin: "Admin",
+  pic: "PIC",
+  project_manager: "PM",
+  guest: "Guest",
+};
+
+/** Fall back to directory from `DFCG users.xlsx` when Supabase is not configured. */
+const mockUsers: UserRow[] = DFCG_DIRECTORY_USERS.map((u) => ({ ...u }));
 
 interface NewUserForm {
   first_name: string;
@@ -147,8 +95,23 @@ interface NewUserForm {
   status: "active" | "inactive";
 }
 
+function sortUsersByName(list: UserRow[]) {
+  return [...list].sort((a, b) => {
+    const la = `${a.last_name} ${a.first_name}`.toLowerCase();
+    const lb = `${b.last_name} ${b.first_name}`.toLowerCase();
+    return la.localeCompare(lb, undefined, { sensitivity: "base" });
+  });
+}
+
 export default function UsersPage() {
-  const [users, setUsers] = useState<UserRow[]>(mockUsers);
+  const [users, setUsers] = useState<UserRow[]>(() =>
+    isSupabaseConfigured ? [] : mockUsers
+  );
+  const [usersLoadState, setUsersLoadState] = useState<
+    "idle" | "loading" | "ok" | "error"
+  >(() => (isSupabaseConfigured ? "loading" : "ok"));
+  const [usersLoadError, setUsersLoadError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [userFormError, setUserFormError] = useState<string | null>(null);
@@ -176,8 +139,13 @@ export default function UsersPage() {
     });
   };
 
-  const toInitials = (firstName: string, lastName: string) =>
-    `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+  const toInitials = (firstName: string, lastName: string) => {
+    const f = firstName.charAt(0);
+    const l = lastName.charAt(0);
+    if (f && l) return `${f}${l}`.toUpperCase();
+    if (f) return firstName.slice(0, 2).toUpperCase() || f.toUpperCase();
+    return "?";
+  };
 
   const closeUserModal = () => {
     setIsUserModalOpen(false);
@@ -211,6 +179,9 @@ export default function UsersPage() {
     const loadUsers = async () => {
       if (!isSupabaseConfigured) return;
 
+      setUsersLoadState("loading");
+      setUsersLoadError(null);
+
       try {
         const response = await fetch("/api/users", { method: "GET" });
         if (!response.ok) {
@@ -232,7 +203,7 @@ export default function UsersPage() {
           }>;
         };
 
-        setUsers(
+        const mapped = sortUsersByName(
           result.users.map((user) => ({
             id: user.id,
             first_name: user.first_name,
@@ -246,13 +217,59 @@ export default function UsersPage() {
             initials: toInitials(user.first_name, user.last_name),
           }))
         );
+
+        setUsers(mapped);
+        setUsersLoadState("ok");
       } catch (error) {
         console.error(error);
+        setUsersLoadError(
+          error instanceof Error ? error.message : "Failed to load users."
+        );
+        setUsersLoadState("error");
+        setUsers([]);
       }
     };
 
     loadUsers();
   }, []);
+
+  const filteredUsers = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter((u) => {
+      const name = `${u.first_name} ${u.last_name}`.toLowerCase();
+      const email = u.email.toLowerCase();
+      const phone = (u.phone_number ?? "").replace(/\D/g, "");
+      const qDigits = q.replace(/\D/g, "");
+      const phoneMatch = qDigits.length >= 3 && phone.includes(qDigits);
+      return (
+        name.includes(q) ||
+        email.includes(q) ||
+        phoneMatch ||
+        ROLE_LABELS[u.role].toLowerCase().includes(q)
+      );
+    });
+  }, [users, searchQuery]);
+
+  const activeCount = users.filter((u) => u.status === "active").length;
+  const inactiveCount = users.length - activeCount;
+  const roleSummary = useMemo(() => {
+    const counts: Record<UserRole, number> = {
+      admin: 0,
+      pic: 0,
+      project_manager: 0,
+      guest: 0,
+    };
+    for (const u of users) counts[u.role] += 1;
+    return counts;
+  }, [users]);
+
+  const roleSummaryLine = useMemo(() => {
+    return (Object.keys(ROLE_LABELS) as UserRole[])
+      .filter((r) => roleSummary[r] > 0)
+      .map((r) => `${roleSummary[r]} ${ROLE_SHORT[r]}`)
+      .join(" · ");
+  }, [roleSummary]);
 
   const handleSaveUser = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -268,19 +285,21 @@ export default function UsersPage() {
     if (!isSupabaseConfigured) {
       if (editingUserId) {
         setUsers((prev) =>
-          prev.map((user) =>
-            user.id === editingUserId
-              ? {
-                  ...user,
-                  first_name: firstName,
-                  last_name: lastName,
-                  email,
-                  phone_number: phoneNumber || null,
-                  role: userForm.role,
-                  status: userForm.status,
-                  initials: toInitials(firstName, lastName),
-                }
-              : user
+          sortUsersByName(
+            prev.map((user) =>
+              user.id === editingUserId
+                ? {
+                    ...user,
+                    first_name: firstName,
+                    last_name: lastName,
+                    email,
+                    phone_number: phoneNumber || null,
+                    role: userForm.role,
+                    status: userForm.status,
+                    initials: toInitials(firstName, lastName),
+                  }
+                : user
+            )
           )
         );
       } else {
@@ -294,7 +313,7 @@ export default function UsersPage() {
           status: userForm.status,
           initials: toInitials(firstName, lastName),
         };
-        setUsers((prev) => [createdUser, ...prev]);
+        setUsers((prev) => sortUsersByName([createdUser, ...prev]));
       }
       closeUserModal();
       return;
@@ -351,10 +370,12 @@ export default function UsersPage() {
 
       if (editingUserId) {
         setUsers((prev) =>
-          prev.map((user) => (user.id === editingUserId ? savedUser : user))
+          sortUsersByName(
+            prev.map((user) => (user.id === editingUserId ? savedUser : user))
+          )
         );
       } else {
-        setUsers((prev) => [savedUser, ...prev]);
+        setUsers((prev) => sortUsersByName([savedUser, ...prev]));
       }
       closeUserModal();
     } catch (error) {
@@ -410,41 +431,130 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Users</h1>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight">Users</h1>
+            {!isSupabaseConfigured && (
+              <Badge
+                variant="outline"
+                className="font-normal text-muted-foreground"
+              >
+                Demo data
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground">
-            Manage team members and roles
+            Manage team members, roles, and Supabase sign-in accounts
           </p>
         </div>
-        <Button type="button" onClick={openCreateModal}>
+        <Button
+          type="button"
+          onClick={openCreateModal}
+          className="shrink-0 self-start sm:self-auto"
+        >
           <Plus className="mr-1.5 h-4 w-4" />
           Add User
         </Button>
       </div>
 
+      {usersLoadError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <p className="font-medium">Could not load users</p>
+          <p className="mt-1">{usersLoadError}</p>
+        </div>
+      )}
+
       <Card>
-        <CardHeader>
-          <CardTitle>Team Members</CardTitle>
-          <CardDescription>
-            {users.filter((u) => u.status === "active").length} active
-            members
-          </CardDescription>
+        <CardHeader className="space-y-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <CardTitle>Team Members</CardTitle>
+              <CardDescription>
+                {usersLoadState === "loading" && isSupabaseConfigured
+                  ? "Loading from Supabase…"
+                  : usersLoadState === "error"
+                    ? "Fix the error above and refresh the page."
+                    : users.length === 0
+                      ? "No users yet. Add someone or sync from your directory."
+                      : `${activeCount} active · ${inactiveCount} inactive · ${roleSummaryLine}`}
+              </CardDescription>
+            </div>
+            <div className="relative w-full sm:max-w-xs">
+              <Search className="text-muted-foreground absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2" />
+              <Input
+                type="search"
+                placeholder="Search name, email, phone, role…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-background pl-9"
+                disabled={
+                  usersLoadState === "loading" ||
+                  (users.length === 0 && isSupabaseConfigured)
+                }
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          <Table>
+          <div className="rounded-md border overflow-x-auto">
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Phone Number</TableHead>
+                <TableHead className="whitespace-nowrap">Phone</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-12">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((user) => (
+              {usersLoadState === "loading" && isSupabaseConfigured ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    <span className="text-muted-foreground inline-flex items-center justify-center gap-2">
+                      <Loader2
+                        className="h-5 w-5 animate-spin"
+                        aria-hidden
+                      />
+                      Loading users…
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ) : usersLoadState === "error" ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={6}
+                    className="text-muted-foreground py-10 text-center text-sm"
+                  >
+                    Users could not be loaded. Check the message above or your
+                    session permissions.
+                  </TableCell>
+                </TableRow>
+              ) : filteredUsers.length === 0 && users.length > 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={6}
+                    className="text-muted-foreground py-10 text-center text-sm"
+                  >
+                    No users match &ldquo;{searchQuery.trim()}&rdquo;. Try
+                    another search.
+                  </TableCell>
+                </TableRow>
+              ) : filteredUsers.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={6}
+                    className="text-muted-foreground py-10 text-center text-sm"
+                  >
+                    {isSupabaseConfigured
+                      ? "No team members in the database yet. Use Add User or your import script."
+                      : "These sample rows are shown when Supabase is not configured."}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredUsers.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell>
                     <div className="flex items-center gap-2.5">
@@ -517,9 +627,11 @@ export default function UsersPage() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))}
+              ))
+              )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 

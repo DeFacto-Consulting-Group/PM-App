@@ -9,7 +9,8 @@
     "lint": "eslint",
     "screenshots": "node scripts/portfolio-screenshots.mjs",
     "screenshots:install": "playwright install chromium",
-    "import:contacts": "node scripts/import-account-contacts.mjs"
+    "import:contacts": "node scripts/import-account-contacts.mjs",
+    "import:users": "node scripts/import-users-from-xlsx.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",
