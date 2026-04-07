@@ -79,8 +79,8 @@ export default function DashboardPage() {
     // Widgets read from localStorage via `getSyncedTasks()`, which is empty on first load otherwise.
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL?.startsWith("http")) return;
 
-    fetch("/api/tasks")
-      .then(async (res) => {
+    const sync = async () => {
+      const res = await fetch("/api/tasks");
         const result = (await res.json().catch(() => ({}))) as {
           tasks?: Array<{
             id: string;
@@ -98,9 +98,16 @@ export default function DashboardPage() {
             sort_order: number;
           }>;
         };
-        if (!res.ok || !result.tasks) return;
+      if (!res.ok || !result.tasks) return;
+      if (result.tasks.length === 0) {
+        // First-run bootstrap: if DB has zero tasks, create them from templates.
+        await fetch("/api/tasks/bootstrap", { method: "POST" }).catch(() => {});
+        // Then re-fetch and sync.
+        const res2 = await fetch("/api/tasks");
+        const result2 = (await res2.json().catch(() => ({}))) as { tasks?: typeof result.tasks };
+        if (!res2.ok || !result2.tasks) return;
         setSyncedTasks(
-          result.tasks.map(
+          result2.tasks.map(
             (t): SyncedTask => ({
               id: t.id,
               project_id: t.project_id,
@@ -118,10 +125,32 @@ export default function DashboardPage() {
             })
           )
         );
-      })
-      .catch(() => {
+        return;
+      }
+      setSyncedTasks(
+        result.tasks.map(
+          (t): SyncedTask => ({
+            id: t.id,
+            project_id: t.project_id,
+            engagement_type: t.engagement_type,
+            bucket: t.bucket,
+            name: t.name,
+            description: t.description ?? null,
+            status: t.status,
+            assigned_to: t.assigned_to ?? null,
+            initials: t.initials ?? null,
+            due_date: t.due_date ?? null,
+            completed_date: t.completed_date ?? null,
+            checklist_items: t.checklist_items ?? [],
+            sort_order: t.sort_order ?? 0,
+          })
+        )
+      );
+    };
+
+    void sync().catch(() => {
         // Non-fatal: dashboard will just show empty widgets.
-      });
+    });
   }, []);
 
   useEffect(() => {
