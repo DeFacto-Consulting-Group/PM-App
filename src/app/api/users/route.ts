@@ -78,7 +78,8 @@ export async function GET() {
   const { data, error } = await supabase
     .from("profiles")
     .select("id, first_name, last_name, email, phone_number, role, status")
-    .order("created_at", { ascending: false });
+    .order("last_name", { ascending: true })
+    .order("first_name", { ascending: true });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
