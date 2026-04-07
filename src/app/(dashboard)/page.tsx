@@ -12,6 +12,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import type { ProjectStatus } from "@/types/index";
 import { UpcomingTasksWidget } from "@/components/dashboard/upcoming-tasks-widget";
 import { OverdueTasksWidget } from "@/components/dashboard/overdue-tasks-widget";
@@ -21,7 +22,8 @@ import {
 } from "@/types/index";
 import { mockProjects } from "@/lib/mock-projects";
 import { setSyncedTasks, type SyncedTask } from "@/lib/task-sync";
-import type { TaskBucket, TaskStatus } from "@/types/index";
+import { getInitialSyncedTasksForProject } from "@/lib/project-task-templates";
+import type { EngagementType, TaskBucket, TaskStatus } from "@/types/index";
 
 const statusOrder: ProjectStatus[] = [
   "active",
@@ -73,6 +75,7 @@ const stats = [
 export default function DashboardPage() {
   const upcomingCardRef = useRef<HTMLDivElement | null>(null);
   const [upcomingCardHeight, setUpcomingCardHeight] = useState<number | null>(null);
+  const [noProjectsInDatabase, setNoProjectsInDatabase] = useState(false);
 
   useEffect(() => {
     // In Supabase mode, populate dashboard widgets from DB-backed tasks.
@@ -101,7 +104,25 @@ export default function DashboardPage() {
       if (!res.ok || !result.tasks) return;
       if (result.tasks.length === 0) {
         // First-run bootstrap: if DB has zero tasks, create them from templates.
-        await fetch("/api/tasks/bootstrap", { method: "POST" }).catch(() => {});
+        const bootRes = await fetch("/api/tasks/bootstrap", {
+          method: "POST",
+        }).catch(() => null);
+        const boot = (await bootRes?.json().catch(() => null)) as
+          | { ok?: boolean; projects?: number }
+          | null;
+        if (boot?.ok === true && boot.projects === 0) {
+          setNoProjectsInDatabase(true);
+          // Demo fallback: generate mock tasks locally so the client can explore the dashboard/UI
+          // without writing any rows to Supabase.
+          const demoTasks: SyncedTask[] = mockProjects.flatMap((p) =>
+            getInitialSyncedTasksForProject(
+              p.project_id,
+              p.engagement_type as EngagementType
+            ).slice(0, 18)
+          );
+          setSyncedTasks(demoTasks);
+          return;
+        }
         // Then re-fetch and sync.
         const res2 = await fetch("/api/tasks");
         const result2 = (await res2.json().catch(() => ({}))) as { tasks?: typeof result.tasks };
@@ -174,6 +195,30 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground">Firm-wide project overview</p>
       </div>
+
+      {noProjectsInDatabase && (
+        <Card className="border-amber-200 bg-amber-50/60 dark:border-amber-900/50 dark:bg-amber-950/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base text-amber-950 dark:text-amber-100">
+              No projects in Supabase yet
+            </CardTitle>
+            <CardDescription className="text-amber-900/90 dark:text-amber-200/90">
+              Tasks are created from templates for each row in the{" "}
+              <code className="rounded bg-amber-100/80 px-1 py-0.5 text-xs dark:bg-amber-900/50">
+                projects
+              </code>{" "}
+              table. The Projects list can still show bundled sample projects; those are not in your
+              database until you add real projects (for example via{" "}
+              <span className="font-medium">New Project</span>).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <Button render={<Link href="/projects/new" />} nativeButton={false}>
+              New project
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <div
         className="grid gap-4"

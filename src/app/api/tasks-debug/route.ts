@@ -58,6 +58,15 @@ export async function GET() {
   const openWithDue = withDue.filter((t) => t.status !== "completed");
   const overdue = openWithDue.filter((t) => parseDueDate(t.due_date!) < today);
 
+  let diagnosis: string | null = null;
+  if (projectCount === 0 && templateCount > 0) {
+    diagnosis =
+      "The projects table has no rows. Task bootstrap copies templates onto each project; with zero projects, zero tasks are created. The Projects page may still list sample data from the app (mock-projects); that is not stored in Supabase until you create or import projects.";
+  } else if (projectCount === 0 && templateCount === 0) {
+    diagnosis =
+      "No projects and no task templates. Seed task_templates and add project rows before tasks can appear.";
+  }
+
   return NextResponse.json({
     ok: true,
     configured: true,
@@ -67,6 +76,7 @@ export async function GET() {
     tasksWithDueDate: withDue.length,
     openTasksWithDueDate: openWithDue.length,
     overdueOpenTasks: overdue.length,
+    ...(diagnosis ? { diagnosis } : {}),
   });
 }
 
