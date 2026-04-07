@@ -20,6 +20,8 @@ import {
   PROJECT_STATUS_COLORS,
 } from "@/types/index";
 import { mockProjects } from "@/lib/mock-projects";
+import { setSyncedTasks, type SyncedTask } from "@/lib/task-sync";
+import type { TaskBucket, TaskStatus } from "@/types/index";
 
 const statusOrder: ProjectStatus[] = [
   "active",
@@ -71,6 +73,56 @@ const stats = [
 export default function DashboardPage() {
   const upcomingCardRef = useRef<HTMLDivElement | null>(null);
   const [upcomingCardHeight, setUpcomingCardHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    // In Supabase mode, populate dashboard widgets from DB-backed tasks.
+    // Widgets read from localStorage via `getSyncedTasks()`, which is empty on first load otherwise.
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL?.startsWith("http")) return;
+
+    fetch("/api/tasks")
+      .then(async (res) => {
+        const result = (await res.json().catch(() => ({}))) as {
+          tasks?: Array<{
+            id: string;
+            project_id: string;
+            engagement_type: SyncedTask["engagement_type"];
+            bucket: TaskBucket;
+            name: string;
+            description: string | null;
+            status: TaskStatus;
+            assigned_to: string | null;
+            initials: string | null;
+            due_date: string | null;
+            completed_date: string | null;
+            checklist_items: SyncedTask["checklist_items"];
+            sort_order: number;
+          }>;
+        };
+        if (!res.ok || !result.tasks) return;
+        setSyncedTasks(
+          result.tasks.map(
+            (t): SyncedTask => ({
+              id: t.id,
+              project_id: t.project_id,
+              engagement_type: t.engagement_type,
+              bucket: t.bucket,
+              name: t.name,
+              description: t.description ?? null,
+              status: t.status,
+              assigned_to: t.assigned_to ?? null,
+              initials: t.initials ?? null,
+              due_date: t.due_date ?? null,
+              completed_date: t.completed_date ?? null,
+              checklist_items: t.checklist_items ?? [],
+              sort_order: t.sort_order ?? 0,
+            })
+          )
+        );
+      })
+      .catch(() => {
+        // Non-fatal: dashboard will just show empty widgets.
+      });
+  }, []);
 
   useEffect(() => {
     const el = upcomingCardRef.current;

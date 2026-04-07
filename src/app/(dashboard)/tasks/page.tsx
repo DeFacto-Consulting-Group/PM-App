@@ -46,6 +46,7 @@ import {
 } from "@/types/index";
 import {
   getSyncedTasks,
+  setSyncedTasks,
   upsertProjectTasks,
   TASK_SYNC_STORAGE_EVENT,
   type SyncedTask,
@@ -374,15 +375,40 @@ function TasksPageContent() {
             project_name: string;
             engagement_type: string;
             bucket: TaskBucket;
+            description?: string | null;
             assignee_name: string | null;
             assigned_to: string | null;
             initials: string | null;
             due_date: string | null;
             status: TaskStatus;
             checklist_items: { name: string; completed: boolean }[];
+            completed_date?: string | null;
+            sort_order?: number;
           }>;
         };
         if (!res.ok || !result.tasks) return;
+
+        // Keep dashboard widgets in sync: they read SyncedTask[] from localStorage.
+        setSyncedTasks(
+          result.tasks.map(
+            (t): SyncedTask => ({
+              id: t.id,
+              project_id: t.project_id,
+              engagement_type: t.engagement_type as EngagementType,
+              bucket: t.bucket,
+              name: t.name,
+              description: t.description ?? null,
+              status: t.status,
+              assigned_to: t.assigned_to ?? null,
+              initials: t.initials ?? null,
+              due_date: t.due_date ?? null,
+              completed_date: t.completed_date ?? null,
+              checklist_items: (t.checklist_items ?? []).map((c) => ({ ...c })),
+              sort_order: t.sort_order ?? 0,
+            })
+          )
+        );
+
         setTasksData(
           result.tasks.map((t) => ({
             id: t.id,
