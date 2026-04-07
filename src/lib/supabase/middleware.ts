@@ -9,6 +9,8 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.next({ request });
   }
 
+  const response = NextResponse.next({ request });
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -28,8 +30,6 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const response = NextResponse.next({ request });
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -39,6 +39,14 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/forgot-password");
 
   if (!user && !isAuthPage) {
+    // Debug logging for production redirect loops (Vercel runtime logs).
+    const cookieNames = request.cookies.getAll().map((c) => c.name);
+    const hasSupabaseCookie = cookieNames.some((n) => n.startsWith("sb-"));
+    console.warn("[auth] redirecting to /login", {
+      path: request.nextUrl.pathname,
+      hasSupabaseCookie,
+      cookieCount: cookieNames.length,
+    });
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
