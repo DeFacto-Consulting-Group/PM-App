@@ -46,11 +46,10 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && isAuthPage) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    return NextResponse.redirect(url);
-  }
+  // Important: don't redirect authenticated users away from auth pages here.
+  // If the app's dashboard layout later determines the user has no profile / lacks access,
+  // it may redirect them back to /login. Redirecting /login -> / in middleware would create
+  // an infinite redirect loop in that situation (observed on Vercel).
 
   return supabaseResponse;
 }
