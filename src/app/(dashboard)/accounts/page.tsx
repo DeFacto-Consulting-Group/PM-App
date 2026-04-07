@@ -37,7 +37,7 @@ async function getProfile(): Promise<Profile> {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, first_name, last_name, email, phone_number, role, status, created_at, updated_at"
+      "id, first_name, last_name, email, phone_number, role, status"
     )
     .eq("id", user.id)
     .single();
@@ -46,7 +46,13 @@ async function getProfile(): Promise<Profile> {
     redirect("/login");
   }
 
-  return profile as Profile;
+  const nowIso = new Date().toISOString();
+  return {
+    ...(profile as Omit<Profile, "avatar_url" | "created_at" | "updated_at">),
+    avatar_url: null,
+    created_at: nowIso,
+    updated_at: nowIso,
+  };
 }
 
 export default async function AccountsPage() {
