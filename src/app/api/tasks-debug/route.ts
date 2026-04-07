@@ -31,6 +31,13 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  const [{ count: projectCount }, { count: templateCount }] = await Promise.all([
+    supabase.from("projects").select("id", { count: "exact", head: true }),
+    supabase.from("task_templates").select("id", { count: "exact", head: true }),
+  ]).then((results) =>
+    results.map((r) => ({ count: r.count ?? 0 }))
+  );
+
   const { data: rows, error } = await supabase
     .from("tasks")
     .select("id, due_date, status")
@@ -54,6 +61,8 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     configured: true,
+    projectCount,
+    taskTemplateCount: templateCount,
     totalTasks: tasks.length,
     tasksWithDueDate: withDue.length,
     openTasksWithDueDate: openWithDue.length,
