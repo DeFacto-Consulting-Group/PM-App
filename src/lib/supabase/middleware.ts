@@ -9,8 +9,6 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.next({ request });
   }
 
-  let supabaseResponse = NextResponse.next({ request });
-
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -20,17 +18,17 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
+          // IMPORTANT: NextRequest cookies are read-only; only set cookies on the response.
+          // This follows Supabase SSR guidance for Next.js middleware.
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options);
+          });
         },
       },
     }
   );
+
+  const response = NextResponse.next({ request });
 
   const {
     data: { user },
@@ -51,5 +49,5 @@ export async function updateSession(request: NextRequest) {
   // it may redirect them back to /login. Redirecting /login -> / in middleware would create
   // an infinite redirect loop in that situation (observed on Vercel).
 
-  return supabaseResponse;
+  return response;
 }
