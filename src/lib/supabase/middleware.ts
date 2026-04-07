@@ -38,7 +38,8 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/login") ||
     request.nextUrl.pathname.startsWith("/forgot-password") ||
     request.nextUrl.pathname.startsWith("/api/auth-debug") ||
-    request.nextUrl.pathname.startsWith("/api/profile-debug");
+    request.nextUrl.pathname.startsWith("/api/profile-debug") ||
+    request.nextUrl.pathname.startsWith("/api/tasks-debug");
 
   if (!user && !isAuthPage) {
     // Debug logging for production redirect loops (Vercel runtime logs).
