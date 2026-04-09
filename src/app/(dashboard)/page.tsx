@@ -228,26 +228,30 @@ export default function DashboardPage() {
           stat.href ? (
             <Link key={stat.label} href={stat.href}>
               <Card className="h-full transition-shadow hover:shadow-md">
-                <CardContent className="flex items-center gap-4">
+                <CardContent className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-4">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-teal-50">
                     <stat.icon className="h-5 w-5 text-[#0d9488]" />
                   </div>
                   <div>
                     <p className="text-2xl font-bold">{stat.value}</p>
-                    <p className="text-sm text-muted-foreground">{stat.label}</p>
+                    <p className="text-xs leading-tight text-muted-foreground sm:text-sm">
+                      {stat.label}
+                    </p>
                   </div>
                 </CardContent>
               </Card>
             </Link>
           ) : (
             <Card key={stat.label}>
-              <CardContent className="flex items-center gap-4">
+              <CardContent className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-4">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-teal-50">
                   <stat.icon className="h-5 w-5 text-[#0d9488]" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{stat.value}</p>
-                  <p className="text-sm text-muted-foreground">{stat.label}</p>
+                  <p className="text-xs leading-tight text-muted-foreground sm:text-sm">
+                    {stat.label}
+                  </p>
                 </div>
               </CardContent>
             </Card>

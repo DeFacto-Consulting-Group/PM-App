@@ -16,6 +16,7 @@ import {
   Menu,
   ChevronsUpDown,
   ClipboardList,
+  NotebookText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -44,6 +45,7 @@ const navItems = [
   { href: "/projects", label: "Projects", icon: FolderOpen },
   { href: "/accounts", label: "Accounts", icon: Building2 },
   { href: "/tasks", label: "Tasks", icon: ListChecks },
+  { href: "/diary", label: "Diary", icon: NotebookText },
 ];
 
 function getInitials(firstName: string, lastName: string): string {

@@ -149,7 +149,7 @@ export default function DiaryPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[40%]">Linked Project</TableHead>
+              <TableHead className="w-[30%]">Linked Project</TableHead>
               <TableHead className="w-[16%]">Follow up Date</TableHead>
               <TableHead>Notes</TableHead>
               <TableHead className="w-[18%]">Input Date</TableHead>
